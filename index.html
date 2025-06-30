@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Health Journey</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        .auth-area {
+            position: absolute;
+            top: 2rem;
+            right: max(2rem, calc((100% - 1200px) / 2));
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .user-info {
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.5rem;
+            border-radius: 100px;
+            color: var(--text-light);
+            position: relative;
+        }
+
+        .user-info.visible {
+            display: flex;
+        }
+
+        .sign-in-button.hidden {
+            display: none;
+        }
+        
+        /* Updated styles for user menu */
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        
+        .user-email-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background-color: var(--card-dark);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-top: 0.5rem;
+            min-width: 200px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            display: none;
+            flex-direction: column;
+            gap: 0.75rem;
+            border: 1px solid var(--border-color);
+            z-index: 110;
+        }
+        
+        .user-email-dropdown.active {
+            display: flex;
+        }
+        
+        .user-email-display {
+            font-size: 0.9rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            word-break: break-all;
+        }
+        
+        /* Fixed sign out button styling */
+        .sign-out-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: none;
+            border: none;
+            padding: 0.5rem;
+            color: var(--text-light);
+            cursor: pointer;
+            border-radius: 6px;
+            width: 100%;
+            transition: background-color 0.2s ease;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+        
+        .sign-out-btn:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .sign-out-btn i {
+            color: #EF4444;
+        }
+
+        /* Updated notification button styles */
+        .notification-button {
+            position: fixed;
+            right: 1.5rem;
+            bottom: 5rem; /* Increased to avoid navigation bar */
+            z-index: 1000; /* Increased z-index to appear above navigation */
+        }
+
+        .notification-button button {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: none;
+            color: white;
+            transition: transform 0.2s ease, background-color 0.2s ease;
+        }
+
+        .notification-button button:hover {
+            transform: translateY(-2px);
+            background-color: var(--primary-hover);
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: #EF4444;
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="dark-mode">
+    <div class="auth-area">
+        <div class="user-info">
+            <div class="user-avatar">
+                <i data-lucide="user" width="20" height="20"></i>
+            </div>
+            <div class="user-email-dropdown">
+                <div class="user-email-display">
+                    <span id="userName"></span>
+                </div>
+                <button class="sign-out-btn" onclick="signOut()">
+                    <i data-lucide="log-out" width="18" height="18"></i>
+                    <span>Sign Out</span>
+                </button>
+            </div>
+        </div>
+        <button class="btn btn-primary sign-in-button" onclick="window.location.href='auth.html'">
+            <i data-lucide="log-in"></i>
+            Sign In
+        </button>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-content">
+            <a href="#" class="nav-link active" data-page="dashboard">
+                <i data-lucide="layout-dashboard"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="#" class="nav-link" data-page="medications">
+                <i data-lucide="pill"></i>
+                <span>Medications</span>
+            </a>
+            <a href="#" class="nav-link" data-page="health">
+                <i data-lucide="activity"></i>
+                <span>Health</span>
+            </a>
+            <a href="#" class="nav-link" data-page="settings">
+                <i data-lucide="settings"></i>
+                <span>Settings</span>
+            </a>
+        </div>
+    </nav>
+
+    <main id="app">
+        <section id="landing-page" class="page active">
+            <div class="hero">
+                <div class="heart-icon">
+                    <i data-lucide="heart" width="96" height="96"></i>
+                </div>
+                <h1>Your Health Journey<br>Starts Here</h1>
+                <p>Track medications, monitor health metrics, and take control of your well-being with our comprehensive health management platform.</p>
+                <button class="btn btn-primary">Get Started <i data-lucide="arrow-right"></i></button>
+            </div>
+
+            <div class="features">
+                <div class="feature-card">
+                    <i data-lucide="pill" width="48" height="48"></i>
+                    <h3>Medication Management</h3>
+                    <p>Never miss a dose with smart reminders and tracking</p>
+                </div>
+                <div class="feature-card">
+                    <i data-lucide="brain" width="48" height="48"></i>
+                    <h3>Health Analytics</h3>
+                    <p>Visualize your health trends with detailed analytics</p>
+                </div>
+                <div class="feature-card">
+                    <i data-lucide="thermometer" width="48" height="48"></i>
+                    <h3>Vital Monitoring</h3>
+                    <p>Track and analyze your vital signs over time</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="dashboard-page" class="page">
+            <header class="page-header">
+                <h1>Welcome Back!</h1>
+                <p class="date">Sunday, December 29, 2024</p>
+            </header>
+
+            <div class="dashboard-grid">
+                <div class="card wellness-score">
+                    <h3><i data-lucide="heart" width="24" height="24"></i> Wellness Score</h3>
+                    <div class="score">85%</div>
+                    <div class="progress-bar">
+                        <div class="progress" style="width: 85%"></div>
+                    </div>
+                    <p>Your health metrics are looking great! Keep up the excellent work.</p>
+                </div>
+
+                <div class="card health-metrics">
+                    <h3>Health Metrics Overview</h3>
+                    <div class="metrics-tabs">
+                        <button class="active">All Metrics</button>
+                        <button>Blood Pressure</button>
+                        <button>Glucose</button>
+                    </div>
+                    <div class="metrics-chart">
+                        <canvas id="metricsChart"></canvas>
+                    </div>
+                    <div class="metrics-legend">
+                        <span class="bp">BP</span>
+                        <span class="glucose">Glucose</span>
+                        <span class="weight">Weight</span>
+                        <span class="temp">Temp</span>
+                    </div>
+                </div>
+
+                <div class="card appointments">
+                    <div class="card-header">
+                        <h3>
+                            <i data-lucide="calendar" width="24" height="24"></i>
+                            Upcoming Appointments
+                        </h3>
+                        <button class="btn-icon">
+                            <i data-lucide="plus" width="20" height="20"></i>
+                        </button>
+                    </div>
+                    <div class="appointment-list">
+                        <div class="appointment">
+                            <div class="appointment-info">
+                                <h4>Dr. Sarah Johnson</h4>
+                                <p>Cardiologist</p>
+                                <p><i data-lucide="calendar"></i> 15/03/2024</p>
+                                <p><i data-lucide="clock"></i> 10:00 AM</p>
+                                <p><i data-lucide="map-pin"></i> Heart Care Center</p>
+                            </div>
+                            <div class="appointment-actions">
+                                <button class="btn-icon">
+                                    <i data-lucide="edit-2"></i>
+                                </button>
+                                <button class="btn-icon delete">
+                                    <i data-lucide="trash-2"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="appointment">
+                            <div class="appointment-info">
+                                <h4>Dr. Michael Chen</h4>
+                                <p>General Physician</p>
+                                <p><i data-lucide="calendar"></i> 20/03/2024</p>
+                                <p><i data-lucide="clock"></i> 2:30 PM</p>
+                                <p><i data-lucide="map-pin"></i> Medical Plaza</p>
+                            </div>
+                            <div class="appointment-actions">
+                                <button class="btn-icon">
+                                    <i data-lucide="edit-2"></i>
+                                </button>
+                                <button class="btn-icon delete">
+                                    <i data-lucide="trash-2"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="medications-page" class="page">
+            <header class="page-header">
+                <h1>Medications</h1>
+                <p>Manage your medications and schedules</p>
+            </header>
+
+            <div class="medications-grid">
+                <div class="medications-top">
+                    <div class="card adherence">
+                        <h3>Medication Adherence</h3>
+                        <div class="adherence-rate">
+                            <span>Monthly Adherence Rate</span>
+                            <span class="rate">0.0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress" style="width: 0%"></div>
+                        </div>
+                        <div class="weekly-tracker">
+                            <h4>Last 7 Days</h4>
+                            <div class="days">
+                                <div class="day"></div>
+                                <div class="day"></div>
+                                <div class="day"></div>
+                                <div class="day"></div>
+                                <div class="day"></div>
+                                <div class="day"></div>
+                                <div class="day"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card quick-actions">
+                        <h3>Quick Actions</h3>
+                        <button class="btn btn-primary"><i data-lucide="plus"></i> Add Medication</button>
+                        <button class="btn btn-danger reset-medications"><i data-lucide="refresh-cw"></i> Reset Medications</button>
+                    </div>
+                </div>
+
+                <div class="card medication-list">
+                    <div class="card-header">
+                        <h3>
+                            <i data-lucide="pill"></i>
+                            Current Medications
+                        </h3>
+                    </div>
+                    <div class="medications-container">
+                        <!-- Medications will be added here dynamically -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="health-page" class="page">
+            <header class="page-header">
+                <h2>Health Tracker</h2>
+                <p class="text-muted">Monitor your health metrics and track your progress</p>
+            </header>
+
+            <div class="health-grid">
+                <div class="card bmi-calculator">
+                    <div class="card-header">
+                        <h3>
+                            <i data-lucide="calculator"></i>
+                            BMI Calculator
+                        </h3>
+                    </div>
+                    <div class="bmi-form">
+                        <div class="form-group">
+                            <label>
+                                <i data-lucide="ruler"></i>
+                                Height (cm)
+                            </label>
+                            <input type="number" id="height" placeholder="Enter your height" required>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <i data-lucide="weight"></i>
+                                Weight (kg)
+                            </label>
+                            <input type="number" id="weight" placeholder="Enter your weight" required>
+                        </div>
+                        <button type="button" id="calculateBMIBtn" class="btn btn-primary">Calculate BMI</button>
+                        <div class="bmi-result" style="display: none;"></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>
+                            <i data-lucide="activity"></i>
+                            Health Metrics
+                        </h3>
+                    </div>
+                    <div class="metrics-grid">
+                        <div class="metric metric-bmi">
+                            <div class="metric-label">BMI</div>
+                            <div class="metric-value">--</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Blood Pressure</div>
+                            <div class="metric-value">--/--</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Weight</div>
+                            <div class="metric-value">-- kg</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Temperature</div>
+                            <div class="metric-value">-- °C</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>
+                            <i data-lucide="line-chart"></i>
+                            Health Trends
+                        </h3>
+                    </div>
+                    <canvas id="healthChart"></canvas>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>
+                            <i data-lucide="plus-circle"></i>
+                            Quick Actions
+                        </h3>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-secondary add-health-log">
+                            <i data-lucide="plus"></i>
+                            Add Health Log
+                        </button>
+                        <button class="btn btn-secondary" onclick="exportData('pdf')">
+                            <i data-lucide="download"></i>
+                            Export Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="settings-page" class="page">
+            <header class="page-header">
+                <h2>Settings</h2>
+                <p class="text-muted">Customize your app preferences</p>
+            </header>
+
+            <div class="settings-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>
+                            <i data-lucide="bell"></i>
+                            Notifications
+                        </h3>
+                    </div>
+                    <div class="settings-list">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h4>Medication Reminders</h4>
+                                <p class="text-muted">Get notified when it's time to take your medications</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="medicationNotifications" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h4>Health Alerts</h4>
+                                <p class="text-muted">Receive alerts for important health updates</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="healthAlerts" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h4>Appointment Reminders</h4>
+                                <p class="text-muted">Get notified about upcoming appointments</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="appointmentReminders" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>
+                            <i data-lucide="settings"></i>
+                            Preferences
+                        </h3>
+                    </div>
+                    <div class="settings-list">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h4>Units</h4>
+                                <p class="text-muted">Choose your preferred measurement system</p>
+                            </div>
+                            <select id="units" class="select-input">
+                                <option value="metric">Metric (kg, cm)</option>
+                                <option value="imperial">Imperial (lb, in)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>
+                            <i data-lucide="database"></i>
+                            Data Management
+                        </h3>
+                    </div>
+                    <div class="settings-list">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h4>Export Data</h4>
+                                <p class="text-muted">Download your health data</p>
+                            </div>
+                            <div class="export-buttons">
+                                <button class="btn btn-secondary" onclick="exportData('pdf')">
+                                    <i data-lucide="file-text"></i>
+                                    PDF
+                                </button>
+                                <button class="btn btn-secondary" onclick="exportData('excel')">
+                                    <i data-lucide="file-spreadsheet"></i>
+                                    Excel
+                                </button>
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h4>Clear Data</h4>
+                                <p class="text-muted">Delete all your stored data</p>
+                            </div>
+                            <button class="btn btn-danger">
+                                <i data-lucide="trash-2"></i>
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <style>
+            .page {
+                padding: 2rem max(1rem, calc((100% - 1200px) / 2));
+            }
+            
+            .nav-content {
+                padding: 0 max(1rem, calc((100% - 1200px) / 2));
+            }
+            
+            .card {
+                height: 100%;
+            }
+            
+            .dashboard-grid,
+            .medications-grid,
+            .health-grid {
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+            
+            @media (min-width: 768px) {
+                .page {
+                    padding-left: max(2rem, calc((100% - 1200px) / 2));
+                    padding-right: max(2rem, calc((100% - 1200px) / 2));
+                }
+            }
+
+            .settings-list {
+                display: flex;
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+
+            .setting-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 1rem;
+                padding: 1rem;
+                border-radius: 12px;
+                background-color: rgba(255, 255, 255, 0.05);
+                transition: background-color 0.2s ease;
+            }
+
+            .setting-item:hover {
+                background-color: rgba(255, 255, 255, 0.08);
+            }
+
+            .setting-info {
+                flex: 1;
+            }
+
+            .setting-info h4 {
+                margin-bottom: 0.25rem;
+                font-size: 1.125rem;
+                color: var(--text-light);
+            }
+
+            .setting-info p {
+                color: var(--text-muted);
+                font-size: 0.875rem;
+            }
+
+            .settings-grid {
+                display: grid;
+                gap: 1.5rem;
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+
+            @media (min-width: 768px) {
+                .settings-grid {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+            }
+
+            @media (min-width: 1024px) {
+                .settings-grid {
+                    grid-template-columns: repeat(3, 1fr);
+                }
+            }
+
+            .toggle {
+                position: relative;
+                display: inline-block;
+                width: 52px;
+                height: 28px;
+            }
+
+            .toggle input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+
+            .toggle-slider {
+                position: absolute;
+                cursor: pointer;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: rgba(255, 255, 255, 0.1);
+                transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                border-radius: 34px;
+            }
+
+            .toggle-slider:before {
+                position: absolute;
+                content: "";
+                height: 20px;
+                width: 20px;
+                left: 4px;
+                bottom: 4px;
+                background-color: white;
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                border-radius: 50%;
+            }
+
+            input:checked + .toggle-slider {
+                background-color: var(--primary-color);
+            }
+
+            input:checked + .toggle-slider:before {
+                transform: translateX(24px);
+            }
+
+            .select-input {
+                padding: 0.75rem 1rem;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 12px;
+                background-color: rgba(255, 255, 255, 0.05);
+                color: var(--text-light);
+                font-size: 1rem;
+                min-width: 160px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .select-input:hover {
+                border-color: rgba(255, 255, 255, 0.2);
+            }
+
+            .select-input:focus {
+                outline: none;
+                border-color: var(--primary-color);
+                box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+            }
+        </style>
+    </main>
+
+    <script src="js/app.js"></script>
+    <script>
+        // Initialize Firebase (place this before any other Firebase code)
+        const firebaseConfig = {
+            apiKey: "AIzaSyCMeyE6ashXBGg3CbLUHOZm0NrdW2ekaT8",
+            authDomain: "medtracker-ce3e4.firebaseapp.com",
+            projectId: "medtracker-ce3e4",
+            storageBucket: "medtracker-ce3e4.firebasestorage.app",
+            messagingSenderId: "964873724883",
+            appId: "1:964873724883:web:74b1e7ef71ba0836a34526"
+        };
+
+        // Initialize Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Enable offline persistence
+        db.enablePersistence()
+            .catch((err) => {
+                if (err.code == 'failed-precondition') {
+                    console.log('Multiple tabs open, persistence can only be enabled in one tab at a a time.');
+                } else if (err.code == 'unimplemented') {
+                    console.log('The current browser does not support persistence.');
+                }
+            });
+
+        // Auth state observer
+        auth.onAuthStateChanged(async function(user) {
+            console.log('Auth state changed:', user);
+            const signInButton = document.querySelector('.sign-in-button');
+            const userInfo = document.querySelector('.user-info');
+            const userNameElement = document.getElementById('userName');
+
+            if (user) {
+                console.log('User is signed in:', user.email);
+                signInButton.classList.add('hidden');
+                userInfo.classList.add('visible');
+                userNameElement.textContent = user.email;
+                
+                // Initialize UI with user's data
+                await initializeUI();
+            } else {
+                console.log('User is signed out');
+                signInButton.classList.remove('hidden');
+                userInfo.classList.remove('visible');
+                userNameElement.textContent = '';
+            }
+        });
+
+        // Sign out function
+        function signOut() {
+            auth.signOut().then(() => {
+                window.location.href = 'auth.html';
+            }).catch((error) => {
+                console.error('Sign out error:', error);
+            });
+        }
+
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Add mock data to localStorage on first load
+        function setupMockData() {
+            const existingData = localStorage.getItem('healthAppData');
+            if (!existingData) {
+                // Create dates for the past week
+                const dates = [];
+                for (let i = 6; i >= 0; i--) {
+                    const date = new Date();
+                    date.setDate(date.getDate() - i);
+                    dates.push(date.toISOString());
+                }
+                
+                // Create mock health data
+                const mockData = {
+                    healthLogs: [
+                        {
+                            date: dates[0],
+                            type: 'BMI',
+                            value: 26.8,
+                            category: 'Overweight',
+                            measurements: { height: 175, weight: 82 }
+                        },
+                        {
+                            date: dates[2],
+                            type: 'BMI',
+                            value: 26.5,
+                            category: 'Overweight',
+                            measurements: { height: 175, weight: 81 }
+                        },
+                        {
+                            date: dates[4],
+                            type: 'BMI',
+                            value: 26.1,
+                            category: 'Overweight',
+                            measurements: { height: 175, weight: 80 }
+                        },
+                        {
+                            date: dates[6],
+                            type: 'BMI',
+                            value: 25.6,
+                            category: 'Overweight',
+                            measurements: { height: 175, weight: 78.5 }
+                        }
+                    ],
+                    healthMetrics: {
+                        bloodPressure: [
+                            { date: dates[0], value: { systolic: 138, diastolic: 88 } },
+                            { date: dates[2], value: { systolic: 136, diastolic: 86 } },
+                            { date: dates[4], value: { systolic: 132, diastolic: 84 } },
+                            { date: dates[6], value: { systolic: 128, diastolic: 82 } }
+                        ],
+                        weight: [
+                            { date: dates[0], value: 82 },
+                            { date: dates[2], value: 81 },
+                            { date: dates[4], value: 80 },
+                            { date: dates[6], value: 78.5 }
+                        ],
+                        temperature: [
+                            { date: dates[1], value: 36.8 },
+                            { date: dates[3], value: 36.6 },
+                            { date: dates[5], value: 36.7 }
+                        ]
+                    }
+                };
+                
+                // Save to localStorage
+                localStorage.setItem('healthAppData', JSON.stringify(mockData));
+                console.log("Mock health data initialized");
+            }
+        }
+
+        // Add this at the end of your existing script content
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load mock data first
+            setupMockData();
+            
+            // BMI Calculator - standalone implementation
+            const calculateBMIBtn = document.getElementById('calculateBMIBtn');
+            if (calculateBMIBtn) {
+                calculateBMIBtn.addEventListener('click', function(e) {
+                    // Get form values
+                    const height = parseFloat(document.getElementById('height').value);
+                    const weight = parseFloat(document.getElementById('weight').value);
+                    
+                    // Validate input
+                    if (!height || !weight) {
+                        alert('Please enter both height and weight');
+                        return;
+                    }
+                    
+                    // Calculate BMI
+                    const heightInMeters = height / 100;
+                    const bmi = weight / (heightInMeters * heightInMeters);
+                    
+                    // Determine category and color
+                    let category, color;
+                    if (bmi < 18.5) {
+                        category = 'Underweight';
+                        color = '#3B82F6';
+                    } else if (bmi < 25) {
+                        category = 'Normal';
+                        color = '#22C55E';
+                    } else if (bmi < 30) {
+                        category = 'Overweight';
+                        color = '#F59E0B';
+                    } else {
+                        category = 'Obese';
+                        color = '#EF4444';
+                    }
+                    
+                    // Update UI
+                    const resultElement = document.querySelector('.bmi-result');
+                    if (resultElement) {
+                        resultElement.innerHTML = `
+                            <div class="result-value" style="color: ${color}">
+                                ${bmi.toFixed(1)}
+                            </div>
+                            <div class="result-category" style="color: ${color}">
+                                ${category}
+                            </div>
+                            <div class="result-explanation">
+                                Your BMI indicates that you are in the ${category.toLowerCase()} range.
+                            </div>
+                        `;
+                        resultElement.style.display = 'block';
+                    }
+                    
+                    // Update BMI metric display
+                    const bmiMetric = document.querySelector('.metric-bmi .metric-value');
+                    if (bmiMetric) {
+                        bmiMetric.textContent = bmi.toFixed(1);
+                    }
+                    
+                    // Try to save to local storage
+                    try {
+                        const appData = JSON.parse(localStorage.getItem('healthAppData')) || {};
+                        const healthLogs = appData.healthLogs || [];
+                        
+                        healthLogs.push({
+                            date: new Date().toISOString(),
+                            type: 'BMI',
+                            value: parseFloat(bmi.toFixed(1)),
+                            category: category,
+                            measurements: { height, weight }
+                        });
+                        
+                        appData.healthLogs = healthLogs;
+                        localStorage.setItem('healthAppData', JSON.stringify(appData));
+                    } catch (error) {
+                        console.error("Error saving to localStorage:", error);
+                    }
+                });
+                
+                console.log("BMI calculator initialized with direct button handling");
+            }
+
+            // Improved Health Trends Chart Initialization
+            function initHealthChart() {
+                const ctx = document.getElementById('healthChart');
+                if (!ctx) return;
+                
+                // Destroy existing chart if there is one
+                const existingChart = Chart.getChart(ctx);
+                if (existingChart) {
+                    existingChart.destroy();
+                }
+                
+                // Get data from localStorage
+                const appData = JSON.parse(localStorage.getItem('healthAppData')) || {};
+                const healthMetrics = appData.healthMetrics || {};
+                
+                // Create arrays for chart data
+                const dates = [];
+                const bmiData = [];
+                const bpData = [];
+                const weightData = [];
+                const tempData = [];
+                
+                // Get dates from the past week for labels
+                const weekLabels = [];
+                for (let i = 6; i >= 0; i--) {
+                    const date = new Date();
+                    date.setDate(date.getDate() - i);
+                    weekLabels.push(date.toLocaleDateString('en-US', { weekday: 'short' }));
+                }
+                
+                // Extract BMI data
+                if (appData.healthLogs) {
+                    const bmiLogs = appData.healthLogs.filter(log => log.type === 'BMI');
+                    bmiLogs.forEach(log => {
+                        const date = new Date(log.date);
+                        dates.push(date);
+                        bmiData.push(log.value);
+                    });
+                }
+                
+                // Create datasets for the chart
+                const datasets = [];
+                
+                // Always add BMI dataset with values or mock data
+                datasets.push({
+                    label: 'BMI',
+                    data: bmiData.length > 0 ? bmiData : [26.8, 26.5, 26.2, 26.0, 25.8, 25.7, 25.6],
+                    borderColor: '#3B82F6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                });
+                
+                // Add blood pressure dataset if available
+                if (healthMetrics.bloodPressure && healthMetrics.bloodPressure.length > 0) {
+                    const bpValues = healthMetrics.bloodPressure.map(bp => bp.value.systolic);
+                    datasets.push({
+                        label: 'Blood Pressure (Systolic)',
+                        data: bpValues,
+                        borderColor: '#EF4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        hidden: false
+                    });
+                }
+                
+                // Add weight dataset if available
+                if (healthMetrics.weight && healthMetrics.weight.length > 0) {
+                    const weightValues = healthMetrics.weight.map(w => w.value);
+                    datasets.push({
+                        label: 'Weight (kg)',
+                        data: weightValues,
+                        borderColor: '#F59E0B',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        hidden: true
+                    });
+                }
+                
+                // Create chart
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: weekLabels,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    color: '#94A3B8'
+                                }
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                backgroundColor: 'rgba(17, 24, 39, 0.8)',
+                                titleColor: '#fff',
+                                bodyColor: '#fff',
+                                borderColor: 'rgba(255, 255, 255, 0.1)',
+                                borderWidth: 1,
+                                padding: 10
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                ticks: {
+                                    color: '#94A3B8'
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                ticks: {
+                                    color: '#94A3B8'
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                console.log("Health Trends chart initialized");
+            }
+
+            // Initialize Health Chart when navigating to health page
+            const healthNav = document.querySelector('.nav-link[data-page="health"]');
+            if (healthNav) {
+                healthNav.addEventListener('click', function() {
+                    // Initialize chart after a small delay to ensure the canvas is in the DOM
+                    setTimeout(() => {
+                        initHealthChart();
+                        updateHealthMetrics();
+                    }, 200);
+                });
+            }
+
+            // Improved Add Health Log button functionality
+            const addHealthLogBtn = document.querySelector('.add-health-log');
+            if (addHealthLogBtn) {
+                addHealthLogBtn.addEventListener('click', function() {
+                    showHealthLogModal();
+                });
+            }
+
+            // Export Report button functionality
+            const exportReportBtn = document.querySelector('.actions .btn-secondary:nth-child(2)');
+            if (exportReportBtn) {
+                exportReportBtn.addEventListener('click', function() {
+                    exportData('pdf');
+                });
+            }
+
+            // Modal functions with visual feedback
+            function showHealthLogModal() {
+                const modal = document.getElementById('healthLogModal');
+                if (modal) {
+                    modal.style.display = 'flex';
+                    
+                    // Setup initial field types
+                    updateMetricFields();
+                    
+                    // Set current datetime
+                    const now = new Date();
+                    const dateTimeString = now.toISOString().slice(0, 16); // Format: YYYY-MM-DDThh:mm
+                    document.getElementById('metricDate').value = dateTimeString;
+                    
+                    // Add some default values based on type for better UX
+                    const metricType = document.getElementById('metricType').value;
+                    if (metricType === 'bloodPressure') {
+                        setTimeout(() => {
+                            document.getElementById('systolic').value = 120;
+                            document.getElementById('diastolic').value = 80;
+                        }, 100);
+                    } else if (metricType === 'weight') {
+                        setTimeout(() => {
+                            document.getElementById('weightValue').value = 75;
+                        }, 100);
+                    } else if (metricType === 'temperature') {
+                        setTimeout(() => {
+                            document.getElementById('temperatureValue').value = 36.6;
+                        }, 100);
+                    }
+                }
+            }
+
+            // Update metric fields based on selected type
+            function updateMetricFields() {
+                const metricType = document.getElementById('metricType').value;
+                const metricFields = document.getElementById('metricFields');
+                
+                let fieldsHTML = '';
+                switch (metricType) {
+                    case 'bloodPressure':
+                        fieldsHTML = `
+                            <div class="bp-inputs">
+                                <div class="form-group">
+                                    <label>Systolic (mmHg)</label>
+                                    <input type="number" id="systolic" required min="70" max="200" value="120">
+                                </div>
+                                <div class="form-group">
+                                    <label>Diastolic (mmHg)</label>
+                                    <input type="number" id="diastolic" required min="40" max="130" value="80">
+                                </div>
+                            </div>
+                        `;
+                        break;
+                    case 'weight':
+                        fieldsHTML = `
+                            <div class="form-group">
+                                <label>Weight (kg)</label>
+                                <input type="number" id="weightValue" required step="0.1" min="20" max="300" value="75">
+                            </div>
+                        `;
+                        break;
+                    case 'temperature':
+                        fieldsHTML = `
+                            <div class="form-group">
+                                <label>Temperature (°C)</label>
+                                <input type="number" id="temperatureValue" required step="0.1" min="35" max="42" value="36.6">
+                            </div>
+                        `;
+                        break;
+                }
+                
+                metricFields.innerHTML = fieldsHTML;
+            }
+
+            // Handle health log form submission with visual feedback
+            const healthLogForm = document.getElementById('healthLogForm');
+            if (healthLogForm) {
+                healthLogForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const metricType = document.getElementById('metricType').value;
+                    const date = document.getElementById('metricDate').value;
+                    let value;
+                    
+                    switch (metricType) {
+                        case 'bloodPressure':
+                            const systolic = parseInt(document.getElementById('systolic').value);
+                            const diastolic = parseInt(document.getElementById('diastolic').value);
+                            value = { systolic, diastolic };
+                            break;
+                        case 'weight':
+                            value = parseFloat(document.getElementById('weightValue').value);
+                            break;
+                        case 'temperature':
+                            value = parseFloat(document.getElementById('temperatureValue').value);
+                            break;
+                    }
+                    
+                    // Save to local storage
+                    try {
+                        const appData = JSON.parse(localStorage.getItem('healthAppData')) || {};
+                        appData.healthMetrics = appData.healthMetrics || {};
+                        appData.healthMetrics[metricType] = appData.healthMetrics[metricType] || [];
+                        
+                        // Add new metric
+                        appData.healthMetrics[metricType].push({
+                            date: new Date(date).toISOString(),
+                            value: value
+                        });
+                        
+                        localStorage.setItem('healthAppData', JSON.stringify(appData));
+                        
+                        // Update UI
+                        updateHealthMetrics(appData);
+                        
+                        // Show success message
+                        alert('Health log added successfully!');
+                    } catch (error) {
+                        console.error("Error saving health log:", error);
+                        alert('Error saving health log. Please try again.');
+                    }
+                    
+                    // Close the modal
+                    const modal = document.getElementById('healthLogModal');
+                    if (modal) {
+                        modal.style.display = 'none';
+                    }
+                    
+                    // Refresh the health chart
+                    setTimeout(() => {
+                        initHealthChart();
+                    }, 100);
+                });
+            }
+
+            // Update metric type fields when dropdown changes
+            const metricType = document.getElementById('metricType');
+            if (metricType) {
+                metricType.addEventListener('change', updateMetricFields);
+            }
+
+            // Close modal buttons
+            document.querySelectorAll('.close-modal, .cancel-modal').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const modal = this.closest('.modal');
+                    if (modal) {
+                        modal.style.display = 'none';
+                    }
+                });
+            });
+
+            // Function to export health data
+            window.exportData = function(format) {
+                try {
+                    const appData = JSON.parse(localStorage.getItem('healthAppData')) || {};
+                    
+                    if (format === 'pdf') {
+                        // Basic PDF content
+                        const docDefinition = {
+                            content: [
+                                { text: 'Health Journey Report', style: 'header' },
+                                { text: new Date().toLocaleDateString(), alignment: 'right', margin: [0, 0, 0, 20] },
+                                
+                                // BMI section if available
+                                { text: 'BMI History', style: 'subheader' },
+                                {
+                                    table: {
+                                        headerRows: 1,
+                                        widths: ['*', '*', '*'],
+                                        body: [
+                                            ['Date', 'BMI', 'Category'],
+                                            ...(appData.healthLogs || [])
+                                                .filter(log => log.type === 'BMI')
+                                                .map(log => [
+                                                    new Date(log.date).toLocaleDateString(),
+                                                    log.value.toFixed(1),
+                                                    log.category
+                                                ])
+                                        ]
+                                    },
+                                    margin: [0, 0, 0, 20]
+                                },
+                                
+                                // Health Metrics section
+                                { text: 'Health Metrics', style: 'subheader' },
+                                {
+                                    table: {
+                                        headerRows: 1,
+                                        widths: ['*', '*', '*'],
+                                        body: [
+                                            ['Date', 'Metric', 'Value'],
+                                            ...(appData.healthMetrics && appData.healthMetrics.bloodPressure || [])
+                                                .map(bp => [
+                                                    new Date(bp.date).toLocaleDateString(),
+                                                    'Blood Pressure',
+                                                    `${bp.value.systolic}/${bp.value.diastolic}`
+                                                ]),
+                                            ...(appData.healthMetrics && appData.healthMetrics.weight || [])
+                                                .map(w => [
+                                                    new Date(w.date).toLocaleDateString(),
+                                                    'Weight',
+                                                    `${w.value} kg`
+                                                ]),
+                                            ...(appData.healthMetrics && appData.healthMetrics.temperature || [])
+                                                .map(t => [
+                                                    new Date(t.date).toLocaleDateString(),
+                                                    'Temperature',
+                                                    `${t.value} °C`
+                                                ])
+                                        ]
+                                    }
+                                }
+                            ],
+                            styles: {
+                                header: {
+                                    fontSize: 22,
+                                    bold: true,
+                                    margin: [0, 0, 0, 10]
+                                },
+                                subheader: {
+                                    fontSize: 16,
+                                    bold: true,
+                                    margin: [0, 10, 0, 5]
+                                }
+                            }
+                        };
+                        
+                        // Generate and download PDF
+                        pdfMake.createPdf(docDefinition).download('health-report.pdf');
+                        alert('PDF report generated!');
+                    } else if (format === 'excel') {
+                        alert('Excel export not yet implemented');
+                    }
+                } catch (error) {
+                    console.error("Error exporting data:", error);
+                    alert('Failed to generate report. Please try again.');
+                }
+            };
+
+            // Improved function to update health metrics display
+            function updateHealthMetrics(appData) {
+                appData = appData || JSON.parse(localStorage.getItem('healthAppData')) || {};
+                const healthMetrics = appData.healthMetrics || {};
+                
+                // Update BMI display from health logs
+                if (appData.healthLogs && appData.healthLogs.length > 0) {
+                    const bmiLogs = appData.healthLogs.filter(log => log.type === 'BMI');
+                    if (bmiLogs.length > 0) {
+                        const latest = bmiLogs[bmiLogs.length - 1];
+                        const bmiElement = document.querySelector('.metric-bmi .metric-value');
+                        if (bmiElement) {
+                            bmiElement.textContent = latest.value.toFixed(1);
+                        }
+                    }
+                }
+                
+                // Update blood pressure display
+                if (healthMetrics.bloodPressure && healthMetrics.bloodPressure.length > 0) {
+                    const latest = healthMetrics.bloodPressure[healthMetrics.bloodPressure.length - 1];
+                    const bpElement = document.querySelector('.metric:nth-child(2) .metric-value');
+                    if (bpElement) {
+                        bpElement.textContent = `${latest.value.systolic}/${latest.value.diastolic}`;
+                    }
+                }
+                
+                // Update weight display
+                if (healthMetrics.weight && healthMetrics.weight.length > 0) {
+                    const latest = healthMetrics.weight[healthMetrics.weight.length - 1];
+                    const weightElement = document.querySelector('.metric:nth-child(3) .metric-value');
+                    if (weightElement) {
+                        weightElement.textContent = `${latest.value} kg`;
+                    }
+                }
+                
+                // Update temperature display
+                if (healthMetrics.temperature && healthMetrics.temperature.length > 0) {
+                    const latest = healthMetrics.temperature[healthMetrics.temperature.length - 1];
+                    const tempElement = document.querySelector('.metric:nth-child(4) .metric-value');
+                    if (tempElement) {
+                        tempElement.textContent = `${latest.value}°C`;
+                    }
+                }
+            }
+
+            // Initialize health metrics if on health page
+            if (document.getElementById('health-page').classList.contains('active')) {
+                setTimeout(() => {
+                    initHealthChart();
+                    updateHealthMetrics();
+                }, 100);
+            }
+
+            // Modified navigation function to ensure health chart is loaded when navigating
+            const navLinks = document.querySelectorAll('.nav-link');
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const pageId = link.dataset.page;
+                    
+                    // Hide all pages first
+                    document.querySelectorAll('.page').forEach(page => {
+                        page.classList.remove('active');
+                        page.style.display = 'none';
+                    });
+                    
+                    // Show target page
+                    const targetPage = document.getElementById(`${pageId}-page`);
+                    if (targetPage) {
+                        targetPage.style.display = 'flex';
+                        setTimeout(() => {
+                            targetPage.classList.add('active');
+                        }, 10);
+                        
+                        // Initialize health page components
+                        if (pageId === 'health') {
+                            setTimeout(() => {
+                                initHealthChart();
+                                updateHealthMetrics();
+                            }, 200);
+                        }
+                    }
+                    
+                    // Update navigation
+                    navLinks.forEach(l => l.classList.remove('active'));
+                    link.classList.add('active');
+                });
+            });
+
+            // Initialize UI with mock data on page load
+            function initializeUI() {
+                // Update health metrics display
+                updateHealthMetrics();
+            }
+
+            // Execute on page load
+            initializeUI();
+        });
+
+        // Add user avatar click handler
+        document.addEventListener('DOMContentLoaded', function() {
+            const userAvatar = document.querySelector('.user-avatar');
+            const userEmailDropdown = document.querySelector('.user-email-dropdown');
+            
+            if (userAvatar) {
+                userAvatar.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    userEmailDropdown.classList.toggle('active');
+                });
+            }
+            
+            // Close dropdown when clicking elsewhere
+            document.addEventListener('click', function() {
+                if (userEmailDropdown && userEmailDropdown.classList.contains('active')) {
+                    userEmailDropdown.classList.remove('active');
+                }
+            });
+        });
+    </script>
+
+    <div id="appointmentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Appointment</h3>
+                <button class="btn-icon close-modal">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form id="appointmentForm">
+                <div class="form-group">
+                    <label>Doctor Name</label>
+                    <input type="text" id="doctorName" required>
+                </div>
+                <div class="form-group">
+                    <label>Specialty</label>
+                    <input type="text" id="specialty" required>
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" id="appointmentDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Time</label>
+                    <input type="time" id="appointmentTime" required>
+                </div>
+                <div class="form-group">
+                    <label>Location</label>
+                    <input type="text" id="location" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary cancel-modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Appointment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="healthLogModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Health Log</h3>
+                <button class="btn-icon close-modal">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form id="healthLogForm">
+                <div class="form-group">
+                    <label>Metric Type</label>
+                    <select id="metricType" required>
+                        <option value="bloodPressure">Blood Pressure</option>
+                        <option value="weight">Weight</option>
+                        <option value="temperature">Temperature</option>
+                    </select>
+                </div>
+                <div id="metricFields">
+                    <!-- Dynamic fields will be added here based on metric type -->
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="datetime-local" id="metricDate" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary cancel-modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Log</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="medicationModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Medication</h3>
+                <button class="btn-icon close-modal">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form id="medicationForm">
+                <div class="form-group">
+                    <label>Medication Name</label>
+                    <input type="text" id="medicationName" required>
+                </div>
+                <div class="form-group">
+                    <label>Dosage</label>
+                    <input type="text" id="dosage" required placeholder="e.g., 500mg">
+                </div>
+                <div class="form-group">
+                    <label>Times (comma-separated)</label>
+                    <input type="text" id="times" required placeholder="e.g., 09:00, 15:00, 21:00">
+                </div>
+                <div class="form-group">
+                    <label>Instructions</label>
+                    <input type="text" id="instructions" required placeholder="e.g., Take with food">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary cancel-modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Medication</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add notification container -->
+    <div id="notification-center" class="notifications-container">
+        <div class="notification-header">
+            <h3>Notifications</h3>
+            <button class="btn-icon" id="close-notifications">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="notification-list">
+            <!-- Notifications will be added here dynamically -->
+        </div>
+    </div>
+
+    <!-- Notification button -->
+    <div class="notification-button">
+        <button class="btn-icon" id="notification-toggle">
+            <i data-lucide="bell"></i>
+            <span class="notification-badge" style="display: none;">0</span>
+        </button>
+    </div>
+
+    <style>
+        /* Notification styles */
+        .notifications-container {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 350px;
+            height: 100vh;
+            background-color: var(--card-dark);
+            z-index: 1000;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.2);
+            transition: right 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid var(--border-color);
+        }
+
+        .notifications-container.active {
+            right: 0;
+        }
+
+        .notification-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .notification-header h3 {
+            margin: 0;
+            color: var(--text-light);
+        }
+
+        .notification-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .notification-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 1rem;
+            position: relative;
+            border-left: 4px solid;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        .notification-item:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .notification-item.medication {
+            border-color: #3B82F6; /* Blue */
+        }
+
+        .notification-item.health {
+            border-color: #10B981; /* Green */
+        }
+
+        .notification-item.appointment {
+            border-color: #F59E0B; /* Orange */
+        }
+
+        .notification-item .title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: var(--text-light);
+        }
+
+        .notification-item .message {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .notification-item .time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .notification-item .actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .notification-button {
+            position: fixed;
+            right: 1.5rem;
+            bottom: 5rem; /* Increased to avoid navigation bar */
+            z-index: 1000; /* Increased z-index to appear above navigation */
+        }
+
+        .notification-button button {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: none;
+            color: white;
+            transition: transform 0.2s ease, background-color 0.2s ease;
+        }
+
+        .notification-button button:hover {
+            transform: translateY(-2px);
+            background-color: var(--primary-hover);
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: #EF4444;
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+    </style>
+</body>
+</html>
